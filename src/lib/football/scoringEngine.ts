@@ -92,17 +92,18 @@ export function topScorelines(matrix: number[][], n = 5): ScoreCell[] {
 
 function buildTrendCandidates(homeShort: string, awayShort: string): { conditions: TrendCondition[]; label: string }[] {
   return [
-    { conditions: [{ type: "OUTCOME", value: "HOME" }, { type: "OVER", line: 1.5 }], label: `Victoire ${homeShort} + Plus de 1.5 but` },
-    { conditions: [{ type: "OUTCOME", value: "AWAY" }, { type: "OVER", line: 1.5 }], label: `Victoire ${awayShort} + Plus de 1.5 but` },
+    // Priorité absolue aux marchés BTTS et combinés ambitieux (Retrait des "Plus de 1.5 but" simples)
+    { conditions: [{ type: "BTTS", value: true }, { type: "OVER", line: 2.5 }], label: `Les deux équipes marquent + Plus de 2.5 buts` },
+    { conditions: [{ type: "BTTS", value: true }], label: `Les deux équipes marquent (BTTS)` },
+    { conditions: [{ type: "OUTCOME", value: "HOME" }, { type: "BTTS", value: true }], label: `Victoire ${homeShort} & Les deux équipes marquent` },
+    { conditions: [{ type: "OUTCOME", value: "AWAY" }, { type: "BTTS", value: true }], label: `Victoire ${awayShort} & Les deux équipes marquent` },
     { conditions: [{ type: "OUTCOME", value: "HOME" }, { type: "BTTS", value: false }], label: `Victoire ${homeShort} & ${awayShort} ne marque pas` },
     { conditions: [{ type: "OUTCOME", value: "AWAY" }, { type: "BTTS", value: false }], label: `Victoire ${awayShort} & ${homeShort} ne marque pas` },
     { conditions: [{ type: "DOUBLE_CHANCE", value: "1X" }, { type: "UNDER", line: 2.5 }], label: `Double Chance ${homeShort} ou Nul + Moins de 2.5 buts` },
     { conditions: [{ type: "DOUBLE_CHANCE", value: "X2" }, { type: "UNDER", line: 2.5 }], label: `Double Chance Nul ou ${awayShort} + Moins de 2.5 buts` },
-    { conditions: [{ type: "BTTS", value: true }, { type: "OVER", line: 2.5 }], label: `Les deux équipes marquent + Plus de 2.5 buts` },
     { conditions: [{ type: "OUTCOME", value: "HOME" }], label: `Victoire ${homeShort}` },
     { conditions: [{ type: "OUTCOME", value: "AWAY" }], label: `Victoire ${awayShort}` },
     { conditions: [{ type: "UNDER", line: 2.5 }], label: `Moins de 2.5 buts` },
-    { conditions: [{ type: "OVER", line: 1.5 }], label: `Plus de 1.5 but` },
     { conditions: [{ type: "OUTCOME", value: "DRAW" }], label: `Match Nul` },
   ];
 }
@@ -195,14 +196,15 @@ export function predictMatch(input: PredictMatchInput): MatchPrediction {
   const bttsYes = sumWhere(matrix, (i, j) => i > 0 && j > 0);
 
   const scorelines = topScorelines(matrix, 5);
-  const scoreExact = scorelines[0] ?? { home: 1, away: 1, probability: 0 };
+  // Suppression du fallback statique : utilise directement le score le plus haut de la matrice
+  const scoreExact = scorelines[0];
 
   const candidates = buildTrendCandidates(input.homeShortName, input.awayShortName).map((c) => ({
     ...c,
     probability: jointProbability(matrix, c.conditions),
   }));
   candidates.sort((a, b) => b.probability - a.probability);
-  const preferred = candidates.find((c) => c.probability >= 0.42) ?? candidates[0];
+  const preferred = candidates[0];
 
   const mainTrend: MainTrend = {
     label: preferred.label,
